@@ -1,5 +1,5 @@
 # fall-detection-threshold-based
-MATLAB implementation of the threshold based fall detection algorithm proposed in the paper:
+MATLAB implementation of the threshold based fall detection algorithm proposed in the paper:  
 A.K. Bourke, G.M. Lyons,
 A threshold-based fall-detection algorithm using a bi-axial gyroscope sensor,
 Medical Engineering & Physics,
