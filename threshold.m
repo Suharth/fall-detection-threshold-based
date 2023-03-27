@@ -7,6 +7,9 @@ non_fall_max=0;
 resultant_array=[];
 droll_arr=[];
 dpitch_arr=[];
+nf_resultant_array=[];
+nf_droll_arr=[];
+nf_dpitch_arr=[];
 %read data
 dataset='D:\TARP\dataset';
 folders=dir(dataset);
@@ -38,7 +41,11 @@ for i=1:length(folders)
                 droll_arr=[droll_arr;data.droll];
                 dpitch_arr=[dpitch_arr;data.dpitch];
             elseif strcmp(sub_folder_name, 'non-fall')
-                non_fall_max=max(non_fall_max,max(sqrt(data.droll.^2+data.dpitch.^2)));
+                resultant=sqrt(data.droll.^2+data.dpitch.^2);
+                non_fall_max=max(non_fall_max,max(resultant));
+                nf_resultant_array=[nf_resultant_array;resultant];
+                nf_droll_arr=[nf_droll_arr;data.droll];
+                nf_dpitch_arr=[nf_dpitch_arr;data.dpitch];
             end
         end
     end
@@ -53,9 +60,11 @@ end
 %%% FT2 calculation %%%
 window_size = 50; %cuz sampling rate = 50Hz
 min_alpha_res = Inf;
-for i = window_size/2+1:length(resultant)-window_size+1
+ft1_exceed_idx=[];
+for i = window_size/2+1:length(resultant_array)-window_size/2
     if(resultant_array(i)>FT1)
         idx=i;
+        ft1_exceed_idx=[ft1_exceed_idx;idx];
         start_index = idx - window_size/2; % find start index for window
         end_index = idx + window_size/2; % find end index for window
         alpha_p=diff(dpitch_arr(start_index:end_index));
@@ -65,10 +74,10 @@ for i = window_size/2+1:length(resultant)-window_size+1
     end
 end
 disp(['FT2=',num2str(min_alpha_res),' rad/s2'])
+FT2=min_alpha_res;
 
 %%% FT3 calculation %%%
 min_theta_res=inf;
-ft1_exceed_idx = find(resultant > FT1);
 for i = 1:length(ft1_exceed_idx)
     % Calculate the start and end indices for the 1.7 second window
     start_idx = max(1, ft1_exceed_idx(i) - 1.2 * 50);
@@ -86,3 +95,35 @@ for i = 1:length(ft1_exceed_idx)
     min_theta_res=min(min_theta_res,max(theta_res));
 end
 disp(['FT3=',num2str(min_theta_res),' rad'])
+FT3=min_theta_res;
+
+nf_ft1_exceed_idx = find(nf_resultant_array > FT1);
+false_positives=0;
+nf_alpha_res=0;
+nf_theta_res=0;
+for i=1:length(nf_ft1_exceed_idx)
+        idx=nf_ft1_exceed_idx(i);
+        start_index = max(1,idx - window_size/2); % find start index for window
+        end_index = min(length(nf_dpitch_arr),idx + window_size/2); % find end index for window
+        alpha_p=diff(nf_dpitch_arr(start_index:end_index));
+        alpha_r=diff(nf_droll_arr(start_index:end_index));
+        nf_alpha_res=sqrt(alpha_p.^2+alpha_r.^2);
+
+        start_idx = max(1, idx - 1.2 * 50);
+        end_idx = min(length(nf_droll_arr), idx + 0.5 * 50);
+
+        % Calculate the time array for the window
+        t = ((start_idx:end_idx) - idx) / 50;
+
+        % Calculate the trunk angle using cumulative integration
+        theta_r(start_idx:end_idx) = cumtrapz(t, nf_droll_arr(start_idx:end_idx));
+        theta_p(start_idx:end_idx) = cumtrapz(t, nf_dpitch_arr(start_idx:end_idx));
+
+        %Resultant trunk angle
+        nf_theta_res=sqrt(theta_p.^2+theta_r.^2);
+
+        if((nf_alpha_res>FT2) & (nf_theta_res>FT3))
+            false_positives=false_positives+1;
+        end
+end
+disp(['False Positives: ',num2str(false_positives)])
